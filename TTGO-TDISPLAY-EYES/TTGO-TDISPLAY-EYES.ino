@@ -64,8 +64,9 @@
 // An I2C ADC could be used for more analogue channels
 #define JOYSTICK_X_PIN 26 // Analog pin for eye horiz pos (else auto)
 #define JOYSTICK_Y_PIN 27 // Analog pin for eye vert position (")
-//#define JOYSTICK_X_FLIP   // If set, reverse stick X axis
-//#define JOYSTICK_Y_FLIP   // If set, reverse stick Y axis
+#define JOYSTICK_X_FLIP   // If set, reverse stick X axis
+#define JOYSTICK_Y_FLIP   // If set, reverse stick Y axis
+
 #define TRACKING          // If enabled, eyelid tracks pupil
 //#define IRIS_PIN       00 // Photocell or potentiometer (else auto iris)
 //#define IRIS_PIN_FLIP  37 // If set, reverse reading from dial/photocell
@@ -97,8 +98,7 @@ struct {
 } eye[] = { SELECT_L_PIN, { WINK_L_PIN, NOBLINK }//,  
            // SELECT_R_PIN, { WINK_R_PIN, NOBLINK }  
 };
-int xyzPins[] = { 26, 27, 25 };
-int xVal, yVal;
+
 TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library 
 #define NUM_EYES 1 //2
 uint32_t fstart = 0;  // start time to improve frame rate calculation at startup
@@ -137,7 +137,7 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   // around automatically from end of rect back to beginning, the region is
   // reset on each frame here in case of an SPI glitch.
   // tft.setAddrWindow(x axis, y axis, Horizontal width, Vertical width);
-  tft.setAddrWindow ( 16, -22, 128, 128 ); 
+  tft.setAddrWindow ( tft.width()/2-75, tft.height()/2-75, SCREEN_WIDTH, SCREEN_HEIGHT ); 
   //if (e == 1){ tft.setAddrWindow (192,0,128,128);}  
   // Now just issue raw 16-bit values for every pixel...
   scleraXsave = scleraX; // Save initial X value to reset on each line
@@ -410,10 +410,6 @@ void split( // Subdivides motion path into two sub-paths w/randimization
  
 // MAIN LOOP -- runs continuously after setup() ----------------------------
 void loop() {
-
-  xVal = analogRead(xyzPins[0]);
-  yVal = analogRead(xyzPins[1]);
-  Serial.printf("x: %d, y: %d\n", xVal, yVal);
   
 #if defined(IRIS_PIN) && (IRIS_PIN >= 0) // Interactive iris
   uint16_t v = 512; //analogRead(IRIS_PIN);// Raw dial/photocell reading
