@@ -6,13 +6,19 @@ front_face_detector = cv2.CascadeClassifier(front_face_path)
 alt_face_detector = cv2.CascadeClassifier(alt_face_path)
 profile_face_detector = cv2.CascadeClassifier(profile_face_path)
 
-def draw_faces(request):
-    global faces, w0, h0, w1, h1
+def draw_outlines(request):
+    global faces, w0, h0, w1, h1, motion_center
 
     with MappedArray(request, "main") as m:
         for f in faces:
             (x, y, w, h) = [c * n // d for c, n, d in zip(f, (w0, h0) * 2, (w1, h1) * 2)]
             cv2.rectangle(m.array, (x, y), (x + w, y + h), (0, 255, 0, 0))
+
+
+        if motion_center:  
+            (cx, cy) = [p * q // r for p, q, r in zip(motion_center, (w0, h0), (w1, h1))]
+            cv2.circle(m.array, (cx, cy), 10, (255, 0, 0), 2) 
+
 
 def find_faces(grey_arr):
     """
@@ -39,16 +45,17 @@ picam2 = Picamera2()
 
 def init_cam():
     global w0, h0, w1, h1
-    global faces
+    global faces, motion_center
 
     faces = []
+    motion_center = ()
     config = picam2.create_preview_configuration(main={"size": (640, 480)},
     lores={"size": (320, 240), "format": "YUV420"})
     picam2.configure(config)
     w0, h0 = picam2.stream_configuration("main")["size"]
     w1, h1 = picam2.stream_configuration("lores")["size"]
 
-    picam2.post_callback = draw_faces
+    picam2.post_callback = draw_outlines
 
     picam2.start(show_preview=True)
     return h1
@@ -61,12 +68,12 @@ def motion_detect(gray_img_1, gray_img_2):
     differenceimage = cv2.absdiff(gray_img_1, gray_img_2)
     differenceimage = cv2.blur(differenceimage, (BLUR_SIZE,BLUR_SIZE))
     # Get threshold of difference image based on THRESHOLD_SENSITIVITY variable
-    retval, thresholdimage = cv2.threshold(differenceimage, THRESHOLD_SENSITIVITY, 255, cv2.THRESH_BINARY)
+    _, thresholdimage = cv2.threshold(differenceimage, THRESHOLD_SENSITIVITY, 255, cv2.THRESH_BINARY)
     # Get all the contours found in the thresholdimage
     try:
-        thresholdimage, contours, hierarchy = cv2.findContours( thresholdimage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
+        thresholdimage, contours, _ = cv2.findContours( thresholdimage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
     except:
-        contours, hierarchy = cv2.findContours( thresholdimage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
+        contours, _ = cv2.findContours( thresholdimage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
     if contours != ():    # Check if Motion Found
         for c in contours:
             found_area = cv2.contourArea(c) # Get area of current contour
@@ -85,7 +92,7 @@ def motion_detect(gray_img_1, gray_img_2):
     return motion_center
 
 def main():
-    global faces
+    global faces, motion_center
     h1 = init_cam()
     prev_frame = None
 
@@ -93,10 +100,12 @@ def main():
         array = picam2.capture_array("lores")
         curr_grey_frame = array[:h1,:]
         faces = find_faces(curr_grey_frame)
-        if len(faces) > 0: print("found face", faces)
+        if verbose and len(faces) > 0: print("found face", faces)
 
         if prev_frame is not None:
-            motion_detect(prev_frame, curr_grey_frame)
+            motion_center = motion_detect(prev_frame, curr_grey_frame)
+
+        prev_frame = curr_grey_frame
 
 
 
