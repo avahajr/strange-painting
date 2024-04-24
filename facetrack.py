@@ -1,24 +1,35 @@
 from picamera2 import Picamera2, MappedArray
 import cv2
+import serial
 from config import *
 
 front_face_detector = cv2.CascadeClassifier(front_face_path)
 alt_face_detector = cv2.CascadeClassifier(alt_face_path)
 profile_face_detector = cv2.CascadeClassifier(profile_face_path)
 
-def draw_outlines(request):
+esp1 = serial.Serial("/dev/ttyACM0", 115200)
+
+def frame_updates(request):
     global faces, w0, h0, w1, h1, motion_center
 
+    # draw outines
     with MappedArray(request, "main") as m:
+        largest_face = get_largest_face(faces)
         for f in faces:
             (x, y, w, h) = [c * n // d for c, n, d in zip(f, (w0, h0) * 2, (w1, h1) * 2)]
-            cv2.rectangle(m.array, (x, y), (x + w, y + h), (0, 255, 0, 0))
-
+            if tuple(f) != largest_face:
+                cv2.rectangle(m.array, (x, y), (x + w, y + h), (0, 255, 0, 0))
+            else:
+                cv2.rectangle(m.array, (x, y), (x + w, y + h), (255, 255, 255, 0))
 
         if motion_center:  
             (cx, cy) = [p * q // r for p, q, r in zip(motion_center, (w0, h0), (w1, h1))]
             cv2.circle(m.array, (cx, cy), 10, (255, 0, 0), 2) 
 
+
+    esp1.write(f'helloworld\n'.encode('utf-8'))
+    line = esp1.readline().decode('utf-8').rstrip()
+    print(line)
 
 def find_faces(grey_arr):
     """
@@ -39,7 +50,16 @@ def find_faces(grey_arr):
 
     return found_faces
 
-
+def get_largest_face(found_faces):
+    max_area = 0
+    largest_face = ()
+    for (x,y,w,h) in found_faces:
+        area = w * h
+        if area > max_area:
+            max_area = area
+            largest_face = (x,y,w,h)	
+            
+    return largest_face
 picam2 = Picamera2()
 
 
@@ -55,7 +75,7 @@ def init_cam():
     w0, h0 = picam2.stream_configuration("main")["size"]
     w1, h1 = picam2.stream_configuration("lores")["size"]
 
-    picam2.post_callback = draw_outlines
+    picam2.post_callback = frame_updates
 
     picam2.start(show_preview=True)
     return h1

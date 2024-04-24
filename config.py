@@ -4,7 +4,7 @@ profile_face_path = '/usr/share/opencv4/haarcascades/haarcascade_profileface.xml
 
 # Display Settings
 debug = True        # Set to False for no data display
-verbose = True      # Add extra detailed information
+verbose = False      # Add extra detailed information
 show_fps = True     # show frames per second processing speed
 window_on = True    # Set to True displays opencv windows (GUI desktop reqd)
 diff_window_on = False  # Show OpenCV image difference window
